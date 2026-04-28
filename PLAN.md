@@ -60,15 +60,27 @@ mesh_url = result["model_mesh"]["url"]
 1. **四边面重拓扑（Quad Remeshing）** — 转为干净的四边面主导拓扑，目标 1-3 万面
 2. **姿态校正为站立姿态** — 四足自动绑骨工具假设输入是中立站姿、四肢分开
 
-### 方案 2A：Tripo 转换 API（PoC 推荐）
+### 方案：fal.ai 上的 Tripo 端点（PoC 推荐）
 
-将 Seed3D 输出的 GLB 上传到 Tripo 转换接口，设置 `quad=true` 和 `face_limit=10000`。成本：30 credits（$0.30）。能处理重拓扑，但**不能**自动校正姿态。
+直接在 fal.ai 内部调用 Tripo 的图生3D 端点并开启 `quad=true`，这样阶段 1 输出的模型 URL 可以直接传给 Tripo 端点做重拓扑，**无需跨平台上传文件**。Seed3D + 重拓扑共用同一个 `FAL_KEY`。
 
-### 方案 2B：Blender 无头管线
+```python
+import fal_client
 
-用 Blender 无头模式（`blender --background --python`）配合：
-- **Instant Meshes** 或 **QuadriFlow** 做重拓扑
-- 自动姿态校正在当前技术下不可靠；因此输入照片的引导很关键
+# 阶段 1 的输出 mesh_url 直接传入
+result = fal_client.subscribe("tripo3d/tripo/v2.5/image-to-3d", arguments={
+    "image_url": photo_url,   # 或直接用原图让 Tripo 也生成一版做对比
+    "quad": True,             # 开启四边面重拓扑
+    "face_limit": 10000,      # 目标面数
+    "texture": True,
+    "pbr": True,
+})
+remeshed_url = result["model_mesh"]["url"]
+```
+
+成本：fal.ai 上 Tripo 生成 + quad remesh 约 $0.05-0.10（按 token 计费，比 Tripo 官方的 30 credits 便宜）。
+
+> **备选方案：** 如果需要更精细控制，可用 Blender 无头模式（`blender --background --python`）配合 Instant Meshes 或 QuadriFlow 做本地重拓扑。
 
 ### PoC 阶段的务实决策：
 
@@ -184,7 +196,7 @@ furever-3d-rigging-poc/
   pipeline/
     __init__.py
     stage1_image_to_3d.py       # Seed3D-2.0 via fal.ai
-    stage2_mesh_prep.py         # Tripo 转换 API 做四边面重拓扑
+    stage2_mesh_prep.py         # fal.ai Tripo 端点做四边面重拓扑
     stage3a_rig_tripo.py        # Tripo 自动绑骨路径
     stage3b_rig_unirig.py       # UniRig 自部署路径
     stage4_animate.py           # 动画编排器
@@ -221,7 +233,7 @@ furever-3d-rigging-poc/
 
 - 搭建项目骨架和配置
 - 实现 `stage1_image_to_3d.py`：Seed3D-2.0 via fal.ai
-- 实现 `stage2_mesh_prep.py`：Tripo 四边面重拓扑
+- 实现 `stage2_mesh_prep.py`：fal.ai Tripo 端点做四边面重拓扑
 - 实现 `stage3a_rig_tripo.py`：check_rig + rig + retarget
 - 跑 10 张测试照片通过完整 Tripo 管线
 - 记录：成功率、每步耗时、总成本、输出质量
@@ -244,8 +256,8 @@ furever-3d-rigging-poc/
   - 末端处理（尾巴、耳朵、爪子 — 正常还是崩坏？）
   - 关节弯曲方向（膝盖弯对方向没？）
 - 对比成本结构：
-  - Tripo 路径：约 $0.88/模型（Seed3D $0.33 + 重拓扑 $0.30 + 绑骨 $0.25）
-  - UniRig 路径：约 $0.43-0.63/模型（Seed3D $0.33 + GPU $0.10-0.30）
+  - Tripo 路径：约 $0.71/模型（Seed3D $0.33 + 重拓扑 $0.08 + 绑骨 $0.25 + 动画 $0.05）
+  - UniRig 路径：约 $0.66/模型（Seed3D $0.33 + 重拓扑 $0.08 + GPU $0.15 + 动画 $0.10）
 - 基于质量门槛和规模经济性做出选择
 - **交付物：** 决策文档（含评分矩阵、10K/100K MAU 成本预测）
 
@@ -264,10 +276,18 @@ furever-3d-rigging-poc/
 ## 单模型成本预估
 
 - **Seed3D-2.0（fal.ai）** — Tripo 路径 $0.33 / UniRig 路径 $0.33
-- **四边面重拓扑（Tripo）** — Tripo 路径 $0.30 / UniRig 路径 $0.30
-- **自动绑骨** — Tripo 路径 $0.25 / UniRig 路径约 $0.15（GPU）
+- **四边面重拓扑（fal.ai Tripo 端点）** — Tripo 路径约 $0.08 / UniRig 路径约 $0.08
+- **自动绑骨** — Tripo 路径 $0.25（Tripo 官方 API）/ UniRig 路径约 $0.15（GPU）
 - **动画重定向** — Tripo 路径免费（Beta）/ UniRig 路径约 $0.05（GPU）
 - **待机动画生成** — Tripo 路径约 $0.05（GPU）/ UniRig 路径约 $0.05（GPU）
-- **合计** — **Tripo 路径约 $0.93** / **UniRig 路径约 $0.88**
+- **合计** — **Tripo 路径约 $0.71** / **UniRig 路径约 $0.66**
 
-按 100K MAU（假设每用户 1 个模型）：每月仅生成成本约 $88K-93K。这印证了自部署 UniRig 在规模化后单位经济性更优的判断 — 随 GPU 成本摊薄，差距会进一步拉大。
+按 100K MAU（假设每用户 1 个模型）：每月仅生成成本约 $66K-71K。重拓扑改走 fal.ai 后每个模型省了约 $0.22。自部署 UniRig 在规模化后单位经济性更优 — 随 GPU 成本摊薄，差距会进一步拉大。
+
+---
+
+## 需要准备的 API Key
+
+- **`FAL_KEY`**（必须，第 1 周）— 注册 https://fal.ai/dashboard — 用于 Seed3D-2.0 图生3D + Tripo 重拓扑，一个 key 搞定两件事
+- **`TRIPO_API_KEY`**（必须，第 1 周）— 注册 https://platform.tripo3d.ai — 仅用于绑骨（auto-rig）和动画重定向（retarget），这两个接口目前只有 Tripo 官方提供
+- **云 GPU 平台账号**（第 2 周）— RunPod / Vast.ai / Lambda 三选一，用于部署 UniRig
