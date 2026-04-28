@@ -1,0 +1,11 @@
+.env
+__pycache__/
+*.pyc
+test_assets/results_tripo/*
+test_assets/results_unirig/*
+!test_assets/results_tripo/.gitkeep
+!test_assets/results_unirig/.gitkeep
+*.glb
+*.fbx
+*.obj
+.DS_Store
