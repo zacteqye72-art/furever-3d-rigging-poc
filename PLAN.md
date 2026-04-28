@@ -143,7 +143,7 @@ bash launch/inference/merge.sh \
 - 无预设动画 — 需在阶段 4 单独生成
 - 训练集 Rig-XL 包含 14,000+ 模型（显式覆盖四足动物）— 对宠物场景理论质量最优
 
-**PoC 部署方式：** 在云 GPU 实例（RunPod / Vast.ai / Lambda）上用 A10G 或 L4 GPU，封装为简单的 FastAPI 服务。
+**PoC 部署方式：** 在 RunPod 上用 A10G 或 L4 GPU 实例，封装为简单的 FastAPI 服务。
 
 ---
 
@@ -241,7 +241,7 @@ furever-3d-rigging-poc/
 
 ### 第 2 周：验证自部署路径（UniRig）+ 待机动画
 
-- 在云 GPU 上部署 UniRig（RunPod A10G 或同级）
+- 在 RunPod 上部署 UniRig（A10G 或 L4 GPU）
 - 实现 `stage3b_rig_unirig.py` 封装三步 CLI
 - 用同样 10 张照片跑 UniRig 路径
 - 编写 Blender 无头脚本：呼吸 + 眨眼 + 摇尾巴
@@ -290,4 +290,4 @@ furever-3d-rigging-poc/
 
 - **`FAL_KEY`**（必须，第 1 周）— 注册 https://fal.ai/dashboard — 用于 Seed3D-2.0 图生3D + Tripo 重拓扑，一个 key 搞定两件事
 - **`TRIPO_API_KEY`**（必须，第 1 周）— 注册 https://platform.tripo3d.ai — 仅用于绑骨（auto-rig）和动画重定向（retarget），这两个接口目前只有 Tripo 官方提供
-- **云 GPU 平台账号**（第 2 周）— RunPod / Vast.ai / Lambda 三选一，用于部署 UniRig
+- **RunPod 账号**（第 2 周，已有）— 用于部署 UniRig（推荐 A10G 或 L4 GPU）
